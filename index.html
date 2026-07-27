@@ -757,7 +757,10 @@
       </div>
       <div class="field">
         <label>Grupo</label>
-        <select id="fldGrupo"></select>
+        <div style="display:flex; gap:6px;">
+          <select id="fldGrupo" style="flex:1;"></select>
+          <button type="button" class="ghost" id="btnQuickAddGrupoModal" title="Adicionar novo grupo" style="padding:8px 12px;">+</button>
+        </div>
       </div>
       <div class="field">
         <label>Time</label>
@@ -1256,6 +1259,19 @@ document.getElementById('btnQuickAddEventoModal').onclick = ()=>{
 };
 document.getElementById('btnQuickAddEventoBulk').onclick = ()=>{
   quickAddEvento((nome)=>{ document.getElementById('bulkEvento').value = nome; });
+};
+
+function quickAddGrupo(afterAddCallback){
+  const nome = prompt('Nome do novo grupo:');
+  if(nome && nome.trim() && !GRUPOS.includes(nome.trim())){
+    GRUPOS.push(nome.trim());
+    refreshDropdowns();
+    if(afterAddCallback) afterAddCallback(nome.trim());
+    toast('Grupo adicionado.');
+  }
+}
+document.getElementById('btnQuickAddGrupoModal').onclick = ()=>{
+  quickAddGrupo((nome)=>{ document.getElementById('fldGrupo').value = nome; });
 };
 
 function quickAddTime(afterAddCallback){
