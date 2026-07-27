@@ -794,10 +794,9 @@
         </div>
       </div>
       <div class="field">
-        <label>Responsáveis (até 2)</label>
+        <label>Responsável</label>
         <div style="display:flex; gap:6px;">
-          <select id="fldResp1" style="flex:1;"><option value="">Sem responsável</option></select>
-          <select id="fldResp2" style="flex:1;"><option value="">2º responsável (opcional)</option></select>
+          <select id="fldResp" style="flex:1;"><option value="">Sem responsável</option></select>
           <button type="button" class="ghost" id="btnQuickAddMembroModal" title="Adicionar novo membro" style="padding:8px 12px;">+</button>
         </div>
       </div>
@@ -828,7 +827,6 @@
         <div id="checklistContainer" class="checklist-container"></div>
         <div class="checklist-add">
           <input type="text" id="newChecklistItem" placeholder="Novo item da checklist...">
-          <select id="newChecklistItemResp" style="max-width:150px;"><option value="">Sem responsável</option></select>
           <button type="button" class="ghost" id="btnAddChecklistItem">+ Adicionar item</button>
         </div>
       </div>
@@ -860,7 +858,7 @@ function dstr(br){ // dd/mm/yyyy -> yyyy-mm-dd
 }
 let uid = 1;
 function T(grupo,tarefa,time,resp,prazo,status,prio,pct,obs,evento){
-  return {id: uid++, evento: evento||EVENTOS[0], grupo, tarefa, time, responsavel: (Array.isArray(resp)?resp:(resp?[resp]:[])).filter(Boolean), prazo: dstr(prazo), status, prioridade: prio, pct: parseInt(pct), obs: obs||""};
+  return {id: uid++, evento: evento||EVENTOS[0], grupo, tarefa, time, responsavel: resp||"", prazo: dstr(prazo), status, prioridade: prio, pct: parseInt(pct), obs: obs||""};
 }
 let TASKS = [
   T("Estrutura","Definir local do evento","RH","Emili","15/07/2025","Atrasado","Alta",90,"Contrato assinado"),
@@ -1083,9 +1081,7 @@ function refreshDropdowns(){
   fillSelect(document.getElementById('fldEvento'), EVENTOS, false);
   fillSelect(document.getElementById('fldGrupo'), GRUPOS, false);
   fillSelect(document.getElementById('fldTime'), TIMES, false);
-  fillSelect(document.getElementById('fldResp1'), MEMBROS, true, 'Sem responsável');
-  fillSelect(document.getElementById('fldResp2'), MEMBROS, true, '2º responsável (opcional)');
-  fillSelect(document.getElementById('newChecklistItemResp'), MEMBROS, true, 'Sem responsável');
+  fillSelect(document.getElementById('fldResp'), MEMBROS, true, 'Sem responsável');
   fillBulkDropdowns();
   renderEventSidebar();
 }
@@ -1131,7 +1127,7 @@ function applyFilters(list){
     if(f.evento && t.evento!==f.evento) return false;
     if(f.grupo && t.grupo!==f.grupo) return false;
     if(f.time && t.time!==f.time) return false;
-    if(f.resp && !(t.responsavel||[]).includes(f.resp)) return false;
+    if(f.resp && t.responsavel!==f.resp) return false;
     if(f.status && effectiveStatus(t)!==f.status) return false;
     if(f.prio && t.prioridade!==f.prio) return false;
     return true;
@@ -1162,7 +1158,7 @@ function renderGeral(){
         <td data-label="Evento">${t.evento? escapeHtml(t.evento) : '<span style="color:var(--text-dim)">—</span>'}</td>
         <td data-label="Tarefa"><strong class="task-name-link" onclick="openEdit(${t.id})" title="Abrir detalhes / checklist">${escapeHtml(t.tarefa)}</strong></td>
         <td data-label="Time">${escapeHtml(t.time)}</td>
-        <td data-label="Responsável">${t.responsavel && t.responsavel.length ? escapeHtml(t.responsavel.join(', ')) : '<span style="color:var(--text-dim)">—</span>'}</td>
+        <td data-label="Responsável">${t.responsavel? escapeHtml(t.responsavel) : '<span style="color:var(--text-dim)">—</span>'}</td>
         <td data-label="Prazo"><span class="deadline clickable ${late?'late':''}" onclick="openDatePopover(event, ${t.id})">📅 ${fmtDate(t.prazo)}</span></td>
         <td data-label="Status"><span class="badge clickable ${statusClass}" onclick="openStatusMenu(event, ${t.id})">${es}</span></td>
         <td data-label="Prioridade"><span class="pr-${slug(t.prioridade)}">${t.prioridade}</span></td>
@@ -1240,7 +1236,7 @@ document.getElementById('btnBulkApply').onclick = ()=>{
   TASKS.forEach(t=>{
     if(!selectedIds.has(t.id)) return;
     if(evento) t.evento = evento;
-    if(resp) t.responsavel = [resp];
+    if(resp) t.responsavel = resp;
     if(time) t.time = time;
     if(prazo){ t.prazo = prazo; t.manualOverride = false; } // prazo mudou: recalcula "Atrasado" automaticamente
     if(status){ t.status = status; t.manualOverride = isLate(t); }
@@ -1273,10 +1269,7 @@ document.getElementById('btnQuickAddMembroBulk').onclick = ()=>{
   quickAddMembro((nome)=>{ document.getElementById('bulkResp').value = nome; });
 };
 document.getElementById('btnQuickAddMembroModal').onclick = ()=>{
-  quickAddMembro((nome)=>{
-    const s1 = document.getElementById('fldResp1'), s2 = document.getElementById('fldResp2');
-    if(!s1.value) s1.value = nome; else if(!s2.value) s2.value = nome;
-  });
+  quickAddMembro((nome)=>{ document.getElementById('fldResp').value = nome; });
 };
 
 function quickAddEvento(afterAddCallback){
@@ -1411,7 +1404,7 @@ function kcardHtml(t){
     <div class="kt-meta">
       <span>${escapeHtml(t.grupo)}</span>
       <span>${escapeHtml(t.time)}</span>
-      ${t.responsavel && t.responsavel.length ? `<span>${escapeHtml(t.responsavel.join(', '))}</span>` : ''}
+      ${t.responsavel ? `<span>${escapeHtml(t.responsavel)}</span>` : ''}
     </div>
     <div class="kt-meta">
       <span class="${late?'deadline late clickable':'deadline clickable'}" onclick="openDatePopover(event, ${t.id})">📅 ${fmtDate(t.prazo)}</span>
@@ -1513,15 +1506,10 @@ function renderGroupedCards(gridId, keyField, allValues, unassignedLabel, filter
   allValues.forEach(v=>map[v]=[]);
   const unassigned = [];
   baseTasks.forEach(t=>{
-    if(keyField==='responsavel'){
-      const arr = t.responsavel||[];
-      if(!arr.length) unassigned.push(t);
-      else arr.forEach(v=>{ if(map.hasOwnProperty(v)) map[v].push(t); });
-    } else {
-      const v = t[keyField];
-      if(v && map.hasOwnProperty(v)) map[v].push(t);
-      else { map[v]=map[v]||[]; map[v].push(t); }
-    }
+    const v = t[keyField];
+    if(v && map.hasOwnProperty(v)) map[v].push(t);
+    else if(!v && keyField==='responsavel') unassigned.push(t);
+    else { map[v]=map[v]||[]; map[v].push(t); }
   });
   let html='';
   Object.keys(map).forEach(name=>{
@@ -1747,7 +1735,7 @@ function toCSVValue(v){
 function exportReportCSV(){
   const headers = ['Evento','Grupo','Tarefa','Time','Responsável','Prazo','Status','Prioridade','Progresso (%)','Observações'];
   const rows = TASKS.map(t=>[
-    t.evento||'', t.grupo||'', t.tarefa||'', t.time||'', (t.responsavel||[]).join(', '),
+    t.evento||'', t.grupo||'', t.tarefa||'', t.time||'', t.responsavel||'',
     fmtDate(t.prazo), effectiveStatus(t), t.prioridade||'', t.pct, t.obs||''
   ]);
   // usa ; como separador (padrão do Excel em português) e BOM para acentos abrirem certo
@@ -1800,8 +1788,7 @@ document.getElementById('fileImportCSV').onchange = (e)=>{
         const tarefa = iTarefa>=0 ? (row[iTarefa]||'').trim() : '';
         if(!tarefa) continue;
         const time = iTime>=0 ? (row[iTime]||'').trim() : '';
-        const respRaw = iResp>=0 ? (row[iResp]||'').trim() : '';
-        const respArr = respRaw ? respRaw.split(/[,/]/).map(s=>s.trim()).filter(Boolean) : [];
+        const resp = iResp>=0 ? (row[iResp]||'').trim() : '';
         const prazoRaw = iPrazo>=0 ? (row[iPrazo]||'').trim() : '';
         const status = iStatus>=0 ? normStatus(row[iStatus]) : 'Não iniciado';
         const prio = iPrio>=0 ? normPrio(row[iPrio]) : 'Média';
@@ -1812,14 +1799,14 @@ document.getElementById('fileImportCSV').onchange = (e)=>{
         const prazoISO = prazoRaw ? toISODate(prazoRaw) : new Date().toISOString().slice(0,10);
 
         TASKS.push({
-          id: uid++, evento: evento || EVENTOS[0] || '', grupo, tarefa, time, responsavel: respArr,
+          id: uid++, evento: evento || EVENTOS[0] || '', grupo, tarefa, time, responsavel: resp,
           prazo: prazoISO, status, prioridade: prio, pct, obs
         });
 
         if(evento && !EVENTOS.includes(evento)) EVENTOS.push(evento);
         if(grupo && !GRUPOS.includes(grupo)) GRUPOS.push(grupo);
         if(time && !TIMES.includes(time)) TIMES.push(time);
-        respArr.forEach(resp=>{ if(resp && !MEMBROS.includes(resp)) MEMBROS.push(resp); });
+        if(resp && !MEMBROS.includes(resp)) MEMBROS.push(resp);
         count++;
       }
       renderAll();
@@ -1855,7 +1842,6 @@ function renderModalChecklist(){
       <div class="checklist-item ${item.feito?'cl-done':''}">
         <input type="checkbox" ${item.feito?'checked':''} onchange="toggleChecklistItem(${item.id}, this)">
         <span class="cl-texto">${escapeHtml(item.texto)}</span>
-        <select class="cl-resp" style="max-width:140px;" onchange="updateChecklistItemResp(${item.id}, this.value)">${checklistRespOptions(item.responsavel)}</select>
         <button type="button" class="cl-remove" title="Remover item" onclick="removeChecklistItem(${item.id})">×</button>
       </div>`).join('');
   }
@@ -1875,15 +1861,6 @@ function recalcPctFromChecklist(){
     note.style.display = 'none';
   }
 }
-function checklistRespOptions(selected){
-  return '<option value="">Sem responsável</option>' + MEMBROS.map(m=>
-    `<option value="${escapeHtml(m)}" ${m===selected?'selected':''}>${escapeHtml(m)}</option>`
-  ).join('');
-}
-window.updateChecklistItemResp = (id, val)=>{
-  const item = modalChecklist.find(i=>i.id===id);
-  if(item) item.responsavel = val;
-};
 window.toggleChecklistItem = (id, chk)=>{
   const item = modalChecklist.find(i=>i.id===id);
   if(item){ item.feito = chk.checked; }
@@ -1897,12 +1874,10 @@ window.removeChecklistItem = (id)=>{
 };
 document.getElementById('btnAddChecklistItem').onclick = ()=>{
   const inp = document.getElementById('newChecklistItem');
-  const respSel = document.getElementById('newChecklistItemResp');
   const v = inp.value.trim();
   if(!v) return;
-  modalChecklist.push({id: clUid++, texto: v, feito: false, responsavel: respSel.value||''});
+  modalChecklist.push({id: clUid++, texto: v, feito: false});
   inp.value = '';
-  respSel.value = '';
   renderModalChecklist();
   inp.focus();
 };
@@ -1918,8 +1893,7 @@ function openNew(){
   document.getElementById('fldEvento').value = EVENTOS[0]||'';
   document.getElementById('fldGrupo').value = GRUPOS[0]||'';
   document.getElementById('fldTime').value = TIMES[0]||'';
-  document.getElementById('fldResp1').value = '';
-  document.getElementById('fldResp2').value = '';
+  document.getElementById('fldResp').value = '';
   document.getElementById('fldPrazo').value = new Date().toISOString().slice(0,10);
   document.getElementById('fldStatus').value = 'Não iniciado';
   document.getElementById('fldPrio').value = 'Média';
@@ -1938,9 +1912,7 @@ window.openEdit = (id)=>{
   document.getElementById('fldEvento').value = t.evento || EVENTOS[0] || '';
   document.getElementById('fldGrupo').value = t.grupo;
   document.getElementById('fldTime').value = t.time;
-  const _respArr = t.responsavel||[];
-  document.getElementById('fldResp1').value = _respArr[0]||'';
-  document.getElementById('fldResp2').value = _respArr[1]||'';
+  document.getElementById('fldResp').value = t.responsavel;
   document.getElementById('fldPrazo').value = t.prazo;
   document.getElementById('fldStatus').value = t.status;
   document.getElementById('fldPrio').value = t.prioridade;
@@ -1960,7 +1932,7 @@ document.getElementById('btnSaveTask').onclick = ()=>{
     evento: document.getElementById('fldEvento').value,
     grupo: document.getElementById('fldGrupo').value,
     time: document.getElementById('fldTime').value,
-    responsavel: [...new Set([document.getElementById('fldResp1').value, document.getElementById('fldResp2').value].filter(Boolean))],
+    responsavel: document.getElementById('fldResp').value,
     prazo: document.getElementById('fldPrazo').value,
     status: document.getElementById('fldStatus').value,
     prioridade: document.getElementById('fldPrio').value,
@@ -2213,9 +2185,9 @@ function renderDashboard(){
     </div>`;
 
   // --- Por responsável
-  const respWithTasks = MEMBROS.filter(m=>TASKS.some(t=>(t.responsavel||[]).includes(m)));
+  const respWithTasks = MEMBROS.filter(m=>TASKS.some(t=>t.responsavel===m));
   const memberItems = respWithTasks.map(m=>{
-    const mt = TASKS.filter(t=>(t.responsavel||[]).includes(m));
+    const mt = TASKS.filter(t=>t.responsavel===m);
     return {label:m, done: mt.filter(t=>effectiveStatus(t)==='Concluído').length, total: mt.length, color:'var(--ok)'};
   });
   const memberHtml = `
@@ -2240,7 +2212,7 @@ function renderDashboard(){
           const cls = d<=1 ? 'soon' : 'ok';
           const label = d===0 ? 'hoje' : d===1 ? '1 dia' : d+' dias';
           return `<div class="dl-item">
-            <div><div class="dl-name">${escapeHtml(t.tarefa)}</div><div class="dl-meta">${escapeHtml(t.grupo)} · ${escapeHtml((t.responsavel&&t.responsavel.length)?t.responsavel.join(', '):'sem responsável')}</div></div>
+            <div><div class="dl-name">${escapeHtml(t.tarefa)}</div><div class="dl-meta">${escapeHtml(t.grupo)} · ${escapeHtml(t.responsavel||'sem responsável')}</div></div>
             <span class="dl-days ${cls}">${label}</span>
           </div>`;
         }).join('') : '<div class="empty-note">Nada previsto por enquanto.</div>'}
@@ -2257,7 +2229,7 @@ function renderDashboard(){
         ${lateTasks.length ? lateTasks.map(t=>{
           const d = Math.abs(daysBetween(t.prazo));
           return `<div class="dl-item">
-            <div><div class="dl-name">${escapeHtml(t.tarefa)}</div><div class="dl-meta">${escapeHtml(t.grupo)} · ${escapeHtml((t.responsavel&&t.responsavel.length)?t.responsavel.join(', '):'sem responsável')}</div></div>
+            <div><div class="dl-name">${escapeHtml(t.tarefa)}</div><div class="dl-meta">${escapeHtml(t.grupo)} · ${escapeHtml(t.responsavel||'sem responsável')}</div></div>
             <span class="dl-days late">${d}d atraso</span>
           </div>`;
         }).join('') : '<div class="empty-note">Nenhuma tarefa atrasada. 🎉</div>'}
