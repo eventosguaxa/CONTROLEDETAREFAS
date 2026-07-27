@@ -478,6 +478,21 @@
   .empty-state { text-align:center; padding: 60px 20px; color:var(--text-dim); }
   .empty-state .big { font-size:34px; margin-bottom:8px; }
 
+  /* ---- Observações por grupo ---- */
+  .notas-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:16px; }
+  .nota-card { border:2px solid var(--line); border-radius:14px; overflow:hidden; background:var(--bg-panel-2); }
+  .nota-card-head {
+    background:#111; color:var(--amber); font-weight:700; font-size:12px;
+    text-transform:uppercase; letter-spacing:.4px; padding:10px 14px;
+  }
+  .nota-textarea {
+    width:100%; min-height:150px; resize:vertical; border:none; background:transparent;
+    padding:12px 14px; font-family:var(--sans); font-size:13px; line-height:1.5; color:var(--text);
+  }
+  .nota-textarea:focus { outline:2px solid var(--amber); outline-offset:-2px; }
+  .empty-note { color:var(--text-dim); font-size:13px; padding:20px; text-align:center; }
+  @media (max-width:720px){ .notas-grid { grid-template-columns: 1fr; } }
+
   @media (max-width: 900px){
     .stats{ grid-template-columns: repeat(2,1fr); }
     .modal-body{ grid-template-columns: 1fr; }
@@ -589,6 +604,7 @@
       <div class="viewtoggle">
         <button id="btnViewList" class="active">☰ Lista</button>
         <button id="btnViewKanban">▦ Kanban</button>
+        <button id="btnViewNotas">📝 Observações</button>
       </div>
     </div>
     <div class="bulkbar" id="bulkBar" style="display:none;">
@@ -656,6 +672,13 @@
       </table>
     </div>
     <div id="viewKanban" class="kanban" style="display:none;"></div>
+    <div id="viewNotas" style="display:none; background:var(--bg-panel); border:2px solid var(--line); border-radius:var(--radius); padding:20px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <strong id="notasTitulo" style="font-family:var(--display); font-style:italic; text-transform:uppercase; font-size:14px;">Observações</strong>
+        <span id="notasStatus" style="font-size:11px; color:var(--text-dim);"></span>
+      </div>
+      <div id="notasGrid" class="notas-grid"></div>
+    </div>
   </section>
 
   <section id="tab-responsavel" style="display:none;">
@@ -825,6 +848,7 @@
 <script>
 /* ================= DADOS BASE (extraídos da planilha) ================= */
 let EVENTOS = ["Evento Principal"];
+let NOTAS = {}; // { [nomeDoEvento]: { [nomeDoGrupo]: "texto livre de observações" } }, chave 'Geral' quando nenhum evento está selecionado
 let GRUPOS = ["Estrutura","Comunicação","Orçamento","Ativações","Comercial","RH"];
 let TIMES = ["RH"];
 let MEMBROS = ["Emili","Danielle","Isabela"];
@@ -882,7 +906,7 @@ let TASKS = [
 const STORAGE_KEY = 'painelTarefasEvento_v1';
 function saveState(){
   try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ TASKS, EVENTOS, GRUPOS, TIMES, MEMBROS, uid }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ TASKS, EVENTOS, GRUPOS, TIMES, MEMBROS, NOTAS, uid }));
   }catch(e){ /* localStorage indisponível (ex: modo privado) — segue sem persistir */ }
 }
 function loadState(){
@@ -896,6 +920,7 @@ function loadState(){
     if(Array.isArray(data.GRUPOS)) GRUPOS = data.GRUPOS;
     if(Array.isArray(data.TIMES)) TIMES = data.TIMES;
     if(Array.isArray(data.MEMBROS)) MEMBROS = data.MEMBROS;
+    if(data.NOTAS && typeof data.NOTAS === 'object') NOTAS = data.NOTAS;
     if(typeof data.uid === 'number') uid = data.uid;
     return true;
   }catch(e){ return false; }
@@ -926,7 +951,7 @@ function syncToSheet(){
   syncTimer = setTimeout(async ()=>{
     try{
       setSyncBadge('Salvando na planilha…', 'pending');
-      const payload = JSON.stringify({ TASKS, EVENTOS, GRUPOS, TIMES, MEMBROS, uid });
+      const payload = JSON.stringify({ TASKS, EVENTOS, GRUPOS, TIMES, MEMBROS, NOTAS, uid });
       await fetch(SHEET_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita bloqueio de CORS (preflight)
@@ -955,11 +980,12 @@ async function syncFromSheet(showToast){
     if(Array.isArray(data.GRUPOS)) GRUPOS = data.GRUPOS;
       if(Array.isArray(data.TIMES)) TIMES = data.TIMES;
       if(Array.isArray(data.MEMBROS)) MEMBROS = data.MEMBROS;
+      if(data.NOTAS && typeof data.NOTAS === 'object') NOTAS = data.NOTAS;
       if(typeof data.uid === 'number') uid = data.uid;
       saveState();
       refreshDropdowns(); renderStats();
       if(currentTab==='dashboard') renderDashboard();
-      if(currentTab==='geral'){ if(currentView==='kanban') renderKanban(); else renderGeral(); }
+      if(currentTab==='geral'){ if(currentView==='kanban') renderKanban(); else if(currentView==='notas') renderNotas(); else renderGeral(); }
       if(currentTab==='responsavel') renderGroupedCards('gridResp','responsavel', MEMBROS, 'Sem responsável definido', 'Resp');
       if(currentTab==='time') renderGroupedCards('gridTime','time', TIMES, '', 'Time');
       if(currentTab==='config') renderConfigLists();
@@ -1293,24 +1319,80 @@ document.getElementById('btnQuickAddTimeBulk').onclick = ()=>{
 };
 
 /* ================= KANBAN ================= */
-let currentView = 'list'; // 'list' | 'kanban'
+let currentView = 'list'; // 'list' | 'kanban' | 'notas'
 
 document.getElementById('btnViewList').onclick = ()=>{
   currentView = 'list';
   document.getElementById('btnViewList').classList.add('active');
   document.getElementById('btnViewKanban').classList.remove('active');
+  document.getElementById('btnViewNotas').classList.remove('active');
   document.getElementById('viewList').style.display = '';
   document.getElementById('viewKanban').style.display = 'none';
+  document.getElementById('viewNotas').style.display = 'none';
   renderGeral();
 };
 document.getElementById('btnViewKanban').onclick = ()=>{
   currentView = 'kanban';
   document.getElementById('btnViewKanban').classList.add('active');
   document.getElementById('btnViewList').classList.remove('active');
+  document.getElementById('btnViewNotas').classList.remove('active');
   document.getElementById('viewList').style.display = 'none';
   document.getElementById('viewKanban').style.display = '';
+  document.getElementById('viewNotas').style.display = 'none';
   renderKanban();
 };
+document.getElementById('btnViewNotas').onclick = ()=>{
+  currentView = 'notas';
+  document.getElementById('btnViewNotas').classList.add('active');
+  document.getElementById('btnViewList').classList.remove('active');
+  document.getElementById('btnViewKanban').classList.remove('active');
+  document.getElementById('viewList').style.display = 'none';
+  document.getElementById('viewKanban').style.display = 'none';
+  document.getElementById('viewNotas').style.display = '';
+  renderNotas();
+};
+
+// Chave usada pra guardar as observações: um conjunto por evento selecionado,
+// ou 'Geral' quando nenhum evento estiver filtrado. Dentro de cada evento,
+// as observações ficam divididas por grupo cadastrado.
+function notasKeyAtual(){
+  return currentEventoTab || 'Geral';
+}
+let notasSaveTimer = null;
+function renderNotas(){
+  const key = notasKeyAtual();
+  document.getElementById('notasTitulo').textContent = 'Observações — ' + key;
+  document.getElementById('notasStatus').textContent = '';
+  if(!NOTAS[key]) NOTAS[key] = {};
+  const grid = document.getElementById('notasGrid');
+
+  if(!GRUPOS.length){
+    grid.innerHTML = '<div class="empty-note">Nenhum grupo cadastrado ainda. Cadastre grupos na aba Cadastros.</div>';
+    return;
+  }
+
+  grid.innerHTML = GRUPOS.map(g=>`
+    <div class="nota-card">
+      <div class="nota-card-head">${escapeHtml(g)}</div>
+      <textarea class="nota-textarea" data-grupo="${escapeHtml(g)}" placeholder="Observações sobre ${escapeHtml(g)}...">${escapeHtml(NOTAS[key][g]||'')}</textarea>
+    </div>`).join('');
+
+  grid.querySelectorAll('.nota-textarea').forEach(ta=>{
+    ta.addEventListener('input', (e)=>{
+      const g = e.target.dataset.grupo;
+      const k = notasKeyAtual();
+      if(!NOTAS[k]) NOTAS[k] = {};
+      NOTAS[k][g] = e.target.value;
+      document.getElementById('notasStatus').textContent = 'Alterações pendentes…';
+      clearTimeout(notasSaveTimer);
+      notasSaveTimer = setTimeout(()=>{
+        saveState();
+        syncToSheet();
+        document.getElementById('notasStatus').textContent = 'Salvo ✓';
+      }, 700);
+    });
+  });
+}
 
 function kcardHtml(t){
   const late = isLate(t);
@@ -1558,7 +1640,7 @@ function renderEventSidebar(){
 
 /* ================= FILTER EVENTS ================= */
 function renderCurrentGeralView(){
-  if(currentView==='kanban') renderKanban(); else renderGeral();
+  if(currentView==='kanban') renderKanban(); else if(currentView==='notas') renderNotas(); else renderGeral();
 }
 ['fSearch','fEvento','fGrupo','fTime','fResp','fStatus','fPrio'].forEach(id=>{
   document.getElementById(id).addEventListener('input', renderCurrentGeralView);
@@ -2164,7 +2246,7 @@ function renderAll(){
   refreshDropdowns();
   renderStats();
   if(currentTab==='dashboard') renderDashboard();
-  if(currentTab==='geral'){ if(currentView==='kanban') renderKanban(); else renderGeral(); }
+  if(currentTab==='geral'){ if(currentView==='kanban') renderKanban(); else if(currentView==='notas') renderNotas(); else renderGeral(); }
   if(currentTab==='responsavel') renderGroupedCards('gridResp','responsavel', MEMBROS, 'Sem responsável definido', 'Resp');
   if(currentTab==='time') renderGroupedCards('gridTime','time', TIMES, '', 'Time');
   if(currentTab==='config') renderConfigLists();
