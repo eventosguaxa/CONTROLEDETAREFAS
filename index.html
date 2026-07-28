@@ -417,6 +417,37 @@
   .task-item .t-meta { color: var(--text-dim); font-size:11.5px; display:flex; gap:10px; flex-wrap:wrap; }
   .empty-note { padding: 30px 16px; text-align:center; color:var(--text-dim); font-size:13px; }
 
+  /* ---- Calendário ---- */
+  .cal-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; }
+  .cal-weekday { text-align:center; font-size:10.5px; font-weight:700; text-transform:uppercase; color:var(--text-dim); padding-bottom:6px; }
+  .cal-cell {
+    min-height:92px; border:2px solid var(--line); border-radius:10px; padding:6px;
+    background:var(--bg-panel); cursor:pointer; display:flex; flex-direction:column; gap:4px;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .cal-cell:hover { border-color:#111; }
+  .cal-cell.cal-outside { opacity:.35; }
+  .cal-cell.cal-today { border-color:var(--amber); }
+  .cal-cell.cal-selected { background: rgba(255,107,26,.09); border-color:var(--amber); }
+  .cal-daynum { font-family:var(--mono); font-size:11px; font-weight:700; }
+  .cal-item-mini {
+    font-size:10px; padding:2px 5px; border-radius:6px; background:var(--bg-panel-2);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .cal-item-mini.cal-evento-mini { background:rgba(255,107,26,.14); color:var(--amber-dim); font-weight:700; }
+  .cal-more { font-size:10px; color:var(--text-dim); }
+  .cal-day-panel { margin-top:16px; border:2px solid var(--line); border-radius:14px; padding:16px; background:var(--bg-panel); }
+  .cal-day-item {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:9px 12px; border:2px solid var(--line); border-radius:10px; margin-bottom:8px;
+  }
+  .cal-day-item .cdi-left { display:flex; flex-direction:column; gap:2px; }
+  .cal-day-item .cdi-tag {
+    font-size:10px; text-transform:uppercase; font-weight:700; letter-spacing:.3px;
+    color:var(--amber-dim);
+  }
+  @media (max-width:720px){ .cal-grid { grid-template-columns: repeat(7, minmax(30px,1fr)); } .cal-cell { min-height:60px; padding:4px; } .cal-item-mini{ display:none; } }
+
   /* ---- Múltiplos responsáveis (modal de tarefa) ---- */
   .resp-checklist {
     flex:1; border:2px solid var(--line); border-radius:10px; padding:8px 10px;
@@ -600,6 +631,7 @@
     <div id="sidebarEventos"></div>
     <button data-tab="responsavel" class="side-link">Por Responsável</button>
     <button data-tab="time" class="side-link">Por Time</button>
+    <button data-tab="calendario" class="side-link">Calendário</button>
     <button data-tab="config" class="side-link">Cadastros</button>
   </aside>
 
@@ -742,6 +774,45 @@
     <div class="cards-grid" id="gridTime"></div>
   </section>
 
+  <section id="tab-calendario" style="display:none;">
+    <div class="filterbar" style="margin-bottom:16px;">
+      <input type="text" id="fSearchCal" placeholder="Buscar tarefa/compromisso...">
+      <select id="fEventoCal"><option value="">Evento (todos)</option></select>
+      <select id="fGrupoCal"><option value="">Grupo (todos)</option></select>
+      <select id="fTimeCal"><option value="">Time (todos)</option></select>
+      <select id="fRespCal"><option value="">Responsável (todos)</option></select>
+      <select id="fStatusCal">
+        <option value="">Status (todos)</option>
+        <option>Não iniciado</option><option>Em andamento</option><option>Concluído</option><option>Atrasado</option>
+      </select>
+      <select id="fPrioCal">
+        <option value="">Prioridade (todas)</option>
+        <option>Alta</option><option>Média</option><option>Baixa</option>
+      </select>
+      <button class="ghost" id="btnClearFiltersCal">Limpar filtros</button>
+    </div>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button type="button" class="ghost" id="btnCalPrev" title="Mês anterior">←</button>
+        <strong id="calMesTitulo" style="font-family:var(--display); font-style:italic; text-transform:uppercase; font-size:16px; min-width:170px; text-align:center;"></strong>
+        <button type="button" class="ghost" id="btnCalNext" title="Próximo mês">→</button>
+        <button type="button" class="ghost" id="btnCalHoje">Hoje</button>
+      </div>
+      <button type="button" class="primary" id="btnCalNovoCompromisso">+ Novo compromisso</button>
+    </div>
+
+    <div id="calGrid" class="cal-grid"></div>
+
+    <div id="calDayPanel" class="cal-day-panel" style="display:none;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+        <strong id="calDayTitulo" style="font-family:var(--display); font-style:italic; text-transform:uppercase; font-size:14px;"></strong>
+        <button type="button" class="ghost" id="btnCalCloseDay">Fechar</button>
+      </div>
+      <div id="calDayList"></div>
+    </div>
+  </section>
+
   <section id="tab-config" style="display:none;">
     <div style="margin-bottom:16px;">
       <h2 style="font-family:var(--display); font-style:italic; text-transform:uppercase; font-size:16px; margin:0 0 4px;">Cadastros</h2>
@@ -812,10 +883,10 @@
         </div>
       </div>
       <div class="field">
-        <label>Time</label>
+        <label>Times</label>
         <div style="display:flex; gap:6px;">
-          <select id="fldTime" style="flex:1;"></select>
-          <button type="button" class="ghost" id="btnQuickAddTimeModal" title="Adicionar novo time" style="padding:8px 12px;">+</button>
+          <div id="fldTimesList" class="resp-checklist"></div>
+          <button type="button" class="ghost" id="btnQuickAddTimeModal" title="Adicionar novo time" style="padding:8px 12px; align-self:flex-start;">+</button>
         </div>
       </div>
       <div class="field">
@@ -868,12 +939,46 @@
   </div>
 </div>
 
+<div class="overlay" id="overlayCal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <strong id="calModalTitle">Novo compromisso</strong>
+      <button class="ghost" id="btnCloseCalModal">✕</button>
+    </div>
+    <div class="modal-body" style="grid-template-columns:1fr;">
+      <div class="field full">
+        <label>Título</label>
+        <input type="text" id="calTitulo" placeholder="Ex: Reunião com fornecedor de bebidas">
+      </div>
+      <div class="field">
+        <label>Data</label>
+        <input type="date" id="calData">
+      </div>
+      <div class="field">
+        <label>Hora (opcional)</label>
+        <input type="time" id="calHora">
+      </div>
+      <div class="field full">
+        <label>Observações</label>
+        <textarea id="calObs" placeholder="Local, pauta, participantes, links..." style="min-height:70px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="ghost danger" id="btnDeleteCalEvento" style="display:none;">Excluir</button>
+      <button class="ghost" id="btnCancelCalModal">Cancelar</button>
+      <button class="primary" id="btnSaveCalEvento">Salvar compromisso</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 /* ================= DADOS BASE (extraídos da planilha) ================= */
 let EVENTOS = ["Evento Principal"];
 let NOTAS = {}; // { [nomeDoEvento]: { [nomeDoGrupo]: "texto livre de observações" } }, chave 'Geral' quando nenhum evento está selecionado
+let CALEVENTOS = []; // compromissos livres no calendário (reuniões etc), não são tarefas: { id, titulo, data, hora, obs }
+let calUid2 = 1;
 let GRUPOS = ["Estrutura","Comunicação","Orçamento","Ativações","Comercial","RH"];
 let TIMES = ["RH"];
 let MEMBROS = ["Emili","Danielle","Isabela"];
@@ -882,21 +987,25 @@ function dstr(br){ // dd/mm/yyyy -> yyyy-mm-dd
   const [d,m,y] = br.split('/'); return `${y}-${m}-${d}`;
 }
 let uid = 1;
-// Converte tarefas salvas no formato antigo (um responsável só, campo "responsavel")
-// para o novo formato com múltiplos responsáveis (array "responsaveis").
+// Converte tarefas salvas no formato antigo (um responsável/time só, campos
+// "responsavel"/"time") para o novo formato com múltiplos (arrays "responsaveis"/"times").
 function migrateTasks(){
   TASKS.forEach(t=>{
     if(!Array.isArray(t.responsaveis)){
       t.responsaveis = t.responsavel ? [t.responsavel] : [];
     }
     delete t.responsavel;
+    if(!Array.isArray(t.times)){
+      t.times = t.time ? [t.time] : [];
+    }
+    delete t.time;
     if(Array.isArray(t.checklist)){
       t.checklist.forEach(item=>{ if(typeof item.responsavel === 'undefined') item.responsavel = ''; });
     }
   });
 }
 function T(grupo,tarefa,time,resp,prazo,status,prio,pct,obs,evento){
-  return {id: uid++, evento: evento||EVENTOS[0], grupo, tarefa, time, responsaveis: resp? [resp] : [], prazo: dstr(prazo), status, prioridade: prio, pct: parseInt(pct), obs: obs||""};
+  return {id: uid++, evento: evento||EVENTOS[0], grupo, tarefa, times: time? [time] : [], responsaveis: resp? [resp] : [], prazo: dstr(prazo), status, prioridade: prio, pct: parseInt(pct), obs: obs||""};
 }
 let TASKS = [
   T("Estrutura","Definir local do evento","RH","Emili","15/07/2025","Atrasado","Alta",90,"Contrato assinado"),
@@ -944,7 +1053,7 @@ let TASKS = [
 const STORAGE_KEY = 'painelTarefasEvento_v1';
 function saveState(){
   try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ TASKS, EVENTOS, GRUPOS, TIMES, MEMBROS, NOTAS, uid }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ TASKS, EVENTOS, GRUPOS, TIMES, MEMBROS, NOTAS, CALEVENTOS, uid }));
   }catch(e){ /* localStorage indisponível (ex: modo privado) — segue sem persistir */ }
 }
 function loadState(){
@@ -959,6 +1068,7 @@ function loadState(){
     if(Array.isArray(data.TIMES)) TIMES = data.TIMES;
     if(Array.isArray(data.MEMBROS)) MEMBROS = data.MEMBROS;
     if(data.NOTAS && typeof data.NOTAS === 'object') NOTAS = data.NOTAS;
+    if(Array.isArray(data.CALEVENTOS)) CALEVENTOS = data.CALEVENTOS;
     if(typeof data.uid === 'number') uid = data.uid;
     migrateTasks();
     return true;
@@ -991,7 +1101,7 @@ function syncToSheet(){
   syncTimer = setTimeout(async ()=>{
     try{
       setSyncBadge('Salvando na planilha…', 'pending');
-      const payload = JSON.stringify({ TASKS, EVENTOS, GRUPOS, TIMES, MEMBROS, NOTAS, uid });
+      const payload = JSON.stringify({ TASKS, EVENTOS, GRUPOS, TIMES, MEMBROS, NOTAS, CALEVENTOS, uid });
       await fetch(SHEET_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita bloqueio de CORS (preflight)
@@ -1021,6 +1131,7 @@ async function syncFromSheet(showToast){
       if(Array.isArray(data.TIMES)) TIMES = data.TIMES;
       if(Array.isArray(data.MEMBROS)) MEMBROS = data.MEMBROS;
       if(data.NOTAS && typeof data.NOTAS === 'object') NOTAS = data.NOTAS;
+      if(Array.isArray(data.CALEVENTOS)) CALEVENTOS = data.CALEVENTOS;
       if(typeof data.uid === 'number') uid = data.uid;
       migrateTasks();
       saveState();
@@ -1028,7 +1139,8 @@ async function syncFromSheet(showToast){
       if(currentTab==='dashboard') renderDashboard();
       if(currentTab==='geral'){ if(currentView==='kanban') renderKanban(); else if(currentView==='notas') renderNotas(); else renderGeral(); }
       if(currentTab==='responsavel') renderGroupedCards('gridResp','responsavel', MEMBROS, 'Sem responsável definido', 'Resp');
-      if(currentTab==='time') renderGroupedCards('gridTime','time', TIMES, '', 'Time');
+      if(currentTab==='time') renderGroupedCards('gridTime','time', TIMES, 'Sem time definido', 'Time');
+      if(currentTab==='calendario') renderCalendario();
       if(currentTab==='config') renderConfigLists();
       setSyncBadge('Atualizado da planilha ✓', 'ok');
       if(showToast) toast('Dados atualizados a partir do Google Sheets.');
@@ -1121,7 +1233,6 @@ function refreshDropdowns(){
   fillSelect(document.getElementById('fResp'), MEMBROS, true, 'Responsável (todos)');
   fillSelect(document.getElementById('fldEvento'), EVENTOS, false);
   fillSelect(document.getElementById('fldGrupo'), GRUPOS, false);
-  fillSelect(document.getElementById('fldTime'), TIMES, false);
   fillBulkDropdowns();
   renderEventSidebar();
 }
@@ -1166,7 +1277,7 @@ function applyFilters(list){
     if(f.q && !t.tarefa.toLowerCase().includes(f.q) && !(t.obs||'').toLowerCase().includes(f.q)) return false;
     if(f.evento && t.evento!==f.evento) return false;
     if(f.grupo && t.grupo!==f.grupo) return false;
-    if(f.time && t.time!==f.time) return false;
+    if(f.time && !(Array.isArray(t.times) && t.times.includes(f.time))) return false;
     if(f.resp && !(Array.isArray(t.responsaveis) && t.responsaveis.includes(f.resp))) return false;
     if(f.status && effectiveStatus(t)!==f.status) return false;
     if(f.prio && t.prioridade!==f.prio) return false;
@@ -1197,7 +1308,7 @@ function renderGeral(){
         <td data-label="Selecionar"><input type="checkbox" class="rowChk" data-id="${t.id}" ${selectedIds.has(t.id)?'checked':''} onchange="toggleSelect(${t.id}, this.checked)"></td>
         <td data-label="Evento">${t.evento? escapeHtml(t.evento) : '<span style="color:var(--text-dim)">—</span>'}</td>
         <td data-label="Tarefa"><strong class="task-name-link" onclick="openEdit(${t.id})" title="Abrir detalhes / checklist">${escapeHtml(t.tarefa)}</strong></td>
-        <td data-label="Time">${escapeHtml(t.time)}</td>
+        <td data-label="Time">${(t.times&&t.times.length)? escapeHtml(t.times.join(', ')) : '<span style="color:var(--text-dim)">—</span>'}</td>
         <td data-label="Responsável">${(t.responsaveis&&t.responsaveis.length)? escapeHtml(t.responsaveis.join(', ')) : '<span style="color:var(--text-dim)">—</span>'}</td>
         <td data-label="Prazo"><span class="deadline clickable ${late?'late':''}" onclick="openDatePopover(event, ${t.id})">📅 ${fmtDate(t.prazo)}</span></td>
         <td data-label="Status"><span class="badge clickable ${statusClass}" onclick="openStatusMenu(event, ${t.id})">${es}</span></td>
@@ -1277,7 +1388,7 @@ document.getElementById('btnBulkApply').onclick = ()=>{
     if(!selectedIds.has(t.id)) return;
     if(evento) t.evento = evento;
     if(resp) t.responsaveis = [resp];
-    if(time) t.time = time;
+    if(time) t.times = [time];
     if(prazo){ t.prazo = prazo; t.manualOverride = false; } // prazo mudou: recalcula "Atrasado" automaticamente
     if(status){ t.status = status; t.manualOverride = isLate(t); }
     if(prio) t.prioridade = prio;
@@ -1357,7 +1468,11 @@ function quickAddTime(afterAddCallback){
   }
 }
 document.getElementById('btnQuickAddTimeModal').onclick = ()=>{
-  quickAddTime((nome)=>{ document.getElementById('fldTime').value = nome; });
+  const atuais = getSelectedTimes();
+  quickAddTime((nome)=>{
+    atuais.push(nome);
+    renderFldTimesList(atuais);
+  });
 };
 document.getElementById('btnQuickAddTimeBulk').onclick = ()=>{
   quickAddTime((nome)=>{ document.getElementById('bulkTime').value = nome; });
@@ -1439,6 +1554,238 @@ function renderNotas(){
   });
 }
 
+/* ================= CALENDÁRIO ================= */
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DIAS_SEMANA_PT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const STATUS_DOT_COLOR = {
+  'Não iniciado':'var(--text-dim)', 'Em andamento':'var(--blue)', 'Concluído':'var(--ok)', 'Atrasado':'var(--danger)'
+};
+let calState = { year: new Date().getFullYear(), month: new Date().getMonth(), selected: null };
+let editingCalId = null;
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+function dateKey(y,m,d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; }
+
+function calFilteredTasks(){
+  const search = document.getElementById('fSearchCal').value.trim().toLowerCase();
+  const evento = document.getElementById('fEventoCal').value;
+  const grupo = document.getElementById('fGrupoCal').value;
+  const time = document.getElementById('fTimeCal').value;
+  const resp = document.getElementById('fRespCal').value;
+  const status = document.getElementById('fStatusCal').value;
+  const prio = document.getElementById('fPrioCal').value;
+  return TASKS.filter(t=>{
+    if(search && !t.tarefa.toLowerCase().includes(search) && !(t.obs||'').toLowerCase().includes(search)) return false;
+    if(evento && t.evento!==evento) return false;
+    if(grupo && t.grupo!==grupo) return false;
+    if(time && !(Array.isArray(t.times) && t.times.includes(time))) return false;
+    if(resp && !(Array.isArray(t.responsaveis) && t.responsaveis.includes(resp))) return false;
+    if(status && effectiveStatus(t)!==status) return false;
+    if(prio && t.prioridade!==prio) return false;
+    return true;
+  });
+}
+
+function renderCalendario(){
+  fillSelect(document.getElementById('fEventoCal'), EVENTOS, true, 'Evento (todos)');
+  fillSelect(document.getElementById('fGrupoCal'), GRUPOS, true, 'Grupo (todos)');
+  fillSelect(document.getElementById('fTimeCal'), TIMES, true, 'Time (todos)');
+  fillSelect(document.getElementById('fRespCal'), MEMBROS, true, 'Responsável (todos)');
+
+  const { year, month } = calState;
+  document.getElementById('calMesTitulo').textContent = `${MESES_PT[month]} de ${year}`;
+
+  const tasks = calFilteredTasks();
+  const tasksByDate = {};
+  tasks.forEach(t=>{ if(t.prazo){ (tasksByDate[t.prazo]=tasksByDate[t.prazo]||[]).push(t); } });
+  const eventsByDate = {};
+  CALEVENTOS.forEach(ev=>{ (eventsByDate[ev.data]=eventsByDate[ev.data]||[]).push(ev); });
+
+  const firstOfMonth = new Date(year, month, 1);
+  const startWeekday = firstOfMonth.getDay(); // 0=domingo
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  const todayKey = dateKey(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+
+  let cells = '';
+  // dias do mês anterior pra completar a primeira semana
+  for(let i=startWeekday-1; i>=0; i--){
+    const d = daysInPrevMonth - i;
+    cells += `<div class="cal-cell cal-outside"><span class="cal-daynum">${d}</span></div>`;
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const key = dateKey(year, month, d);
+    const dayTasks = tasksByDate[key] || [];
+    const dayEvents = eventsByDate[key] || [];
+    const all = [...dayEvents.map(e=>({...e, _tipo:'evento'})), ...dayTasks.map(t=>({...t, _tipo:'tarefa'}))];
+    const isToday = key===todayKey;
+    const isSelected = calState.selected===key;
+    const itemsHtml = all.slice(0,3).map(it=>{
+      if(it._tipo==='evento') return `<div class="cal-item-mini cal-evento-mini">📌 ${escapeHtml(it.titulo)}</div>`;
+      return `<div class="cal-item-mini" style="border-left:3px solid ${STATUS_DOT_COLOR[effectiveStatus(it)]||'var(--line)'};">${escapeHtml(it.tarefa)}</div>`;
+    }).join('');
+    const moreCount = all.length - 3;
+    cells += `<div class="cal-cell ${isToday?'cal-today':''} ${isSelected?'cal-selected':''}" onclick="selectCalDay('${key}')">
+      <span class="cal-daynum">${d}</span>
+      ${itemsHtml}
+      ${moreCount>0 ? `<span class="cal-more">+${moreCount} mais</span>` : ''}
+    </div>`;
+  }
+  // completa a última semana com dias do próximo mês
+  const totalCells = startWeekday + daysInMonth;
+  const trailing = (7 - (totalCells % 7)) % 7;
+  for(let d=1; d<=trailing; d++){
+    cells += `<div class="cal-cell cal-outside"><span class="cal-daynum">${d}</span></div>`;
+  }
+
+  const weekdaysHtml = DIAS_SEMANA_PT.map(d=>`<div class="cal-weekday">${d}</div>`).join('');
+  document.getElementById('calGrid').innerHTML = weekdaysHtml + cells;
+
+  if(calState.selected) renderCalDayPanel(calState.selected, tasksByDate, eventsByDate);
+}
+
+window.selectCalDay = (key)=>{
+  calState.selected = (calState.selected===key) ? null : key;
+  renderCalendario();
+};
+
+function fmtDatePt(key){
+  const [y,m,d] = key.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function renderCalDayPanel(key, tasksByDate, eventsByDate){
+  const panel = document.getElementById('calDayPanel');
+  panel.style.display = '';
+  document.getElementById('calDayTitulo').textContent = fmtDatePt(key);
+  const dayTasks = (tasksByDate && tasksByDate[key]) || calFilteredTasks().filter(t=>t.prazo===key);
+  const dayEvents = (eventsByDate && eventsByDate[key]) || CALEVENTOS.filter(e=>e.data===key);
+  const list = document.getElementById('calDayList');
+
+  if(!dayTasks.length && !dayEvents.length){
+    list.innerHTML = '<div class="empty-note">Nada agendado para este dia.</div>';
+    return;
+  }
+
+  const eventsHtml = dayEvents.map(ev=>`
+    <div class="cal-day-item">
+      <div class="cdi-left">
+        <span class="cdi-tag">📌 Compromisso ${ev.hora? '· '+ev.hora : ''}</span>
+        <strong>${escapeHtml(ev.titulo)}</strong>
+        ${ev.obs ? `<span style="font-size:12px; color:var(--text-dim);">${escapeHtml(ev.obs)}</span>` : ''}
+      </div>
+      <button type="button" class="ghost" onclick="openEditCalEvento(${ev.id})">✎</button>
+    </div>`).join('');
+
+  const tasksHtml = dayTasks.map(t=>{
+    const es = effectiveStatus(t);
+    return `<div class="cal-day-item">
+      <div class="cdi-left">
+        <span class="cdi-tag" style="color:${STATUS_DOT_COLOR[es]||'var(--amber-dim)'};">🗂️ Tarefa · ${escapeHtml(es)}</span>
+        <span class="task-name-link" style="cursor:pointer; font-weight:700;" onclick="openEdit(${t.id})">${escapeHtml(t.tarefa)}</span>
+        <span style="font-size:12px; color:var(--text-dim);">${escapeHtml(t.grupo||'')}</span>
+      </div>
+      <button type="button" class="ghost" onclick="openEdit(${t.id})">✎</button>
+    </div>`;
+  }).join('');
+
+  list.innerHTML = eventsHtml + tasksHtml;
+}
+
+document.getElementById('btnCalPrev').onclick = ()=>{
+  calState.month--;
+  if(calState.month<0){ calState.month=11; calState.year--; }
+  renderCalendario();
+};
+document.getElementById('btnCalNext').onclick = ()=>{
+  calState.month++;
+  if(calState.month>11){ calState.month=0; calState.year++; }
+  renderCalendario();
+};
+document.getElementById('btnCalHoje').onclick = ()=>{
+  const now = new Date();
+  calState.year = now.getFullYear();
+  calState.month = now.getMonth();
+  calState.selected = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
+  renderCalendario();
+};
+document.getElementById('btnCalCloseDay').onclick = ()=>{
+  calState.selected = null;
+  document.getElementById('calDayPanel').style.display = 'none';
+  renderCalendario();
+};
+document.getElementById('btnClearFiltersCal').onclick = ()=>{
+  ['fSearchCal','fEventoCal','fGrupoCal','fTimeCal','fRespCal','fStatusCal','fPrioCal'].forEach(id=>document.getElementById(id).value='');
+  renderCalendario();
+};
+['fSearchCal','fEventoCal','fGrupoCal','fTimeCal','fRespCal','fStatusCal','fPrioCal'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', renderCalendario);
+});
+
+/* ---- Modal de compromisso (evento livre no calendário, não é tarefa) ---- */
+const overlayCal = document.getElementById('overlayCal');
+function openNewCalEvento(dataPreset){
+  editingCalId = null;
+  document.getElementById('calModalTitle').textContent = 'Novo compromisso';
+  document.getElementById('btnDeleteCalEvento').style.display = 'none';
+  document.getElementById('calTitulo').value = '';
+  document.getElementById('calData').value = dataPreset || calState.selected || new Date().toISOString().slice(0,10);
+  document.getElementById('calHora').value = '';
+  document.getElementById('calObs').value = '';
+  overlayCal.classList.add('show');
+}
+window.openEditCalEvento = (id)=>{
+  const ev = CALEVENTOS.find(e=>e.id===id); if(!ev) return;
+  editingCalId = id;
+  document.getElementById('calModalTitle').textContent = 'Editar compromisso';
+  document.getElementById('btnDeleteCalEvento').style.display = '';
+  document.getElementById('calTitulo').value = ev.titulo;
+  document.getElementById('calData').value = ev.data;
+  document.getElementById('calHora').value = ev.hora||'';
+  document.getElementById('calObs').value = ev.obs||'';
+  overlayCal.classList.add('show');
+};
+function closeCalModal(){ overlayCal.classList.remove('show'); }
+document.getElementById('btnCancelCalModal').onclick = closeCalModal;
+document.getElementById('btnCloseCalModal').onclick = closeCalModal;
+overlayCal.addEventListener('click', e=>{ if(e.target===overlayCal) closeCalModal(); });
+
+document.getElementById('btnCalNovoCompromisso').onclick = ()=> openNewCalEvento();
+
+document.getElementById('btnSaveCalEvento').onclick = async ()=>{
+  const titulo = document.getElementById('calTitulo').value.trim();
+  const data = document.getElementById('calData').value;
+  if(!titulo || !data){ toast('Preencha ao menos o título e a data.'); return; }
+  const payload = {
+    titulo, data,
+    hora: document.getElementById('calHora').value,
+    obs: document.getElementById('calObs').value.trim(),
+  };
+  if(editingCalId){
+    const ev = CALEVENTOS.find(e=>e.id===editingCalId);
+    Object.assign(ev, payload);
+    toast('Compromisso atualizado.');
+  } else {
+    const nextId = CALEVENTOS.reduce((m,e)=>Math.max(m,e.id),0)+1;
+    CALEVENTOS.push({id: nextId, ...payload});
+    toast('Compromisso adicionado.');
+  }
+  closeCalModal();
+  saveState();
+  await syncToSheet();
+  renderCalendario();
+};
+document.getElementById('btnDeleteCalEvento').onclick = async ()=>{
+  if(!editingCalId) return;
+  if(!confirm('Excluir este compromisso?')) return;
+  CALEVENTOS = CALEVENTOS.filter(e=>e.id!==editingCalId);
+  closeCalModal();
+  toast('Compromisso excluído.');
+  saveState();
+  await syncToSheet();
+  renderCalendario();
+};
+
 function kcardHtml(t){
   const late = isLate(t);
   return `<div class="kcard" draggable="true" data-id="${t.id}" ondragstart="kDragStart(event, ${t.id})">
@@ -1448,7 +1795,7 @@ function kcardHtml(t){
     </div>
     <div class="kt-meta">
       <span>${escapeHtml(t.grupo)}</span>
-      <span>${escapeHtml(t.time)}</span>
+      ${(t.times && t.times.length) ? `<span>${escapeHtml(t.times.join(', '))}</span>` : ''}
       ${(t.responsaveis && t.responsaveis.length) ? `<span>${escapeHtml(t.responsaveis.join(', '))}</span>` : ''}
     </div>
     <div class="kt-meta">
@@ -1551,10 +1898,12 @@ function renderGroupedCards(gridId, keyField, allValues, unassignedLabel, filter
   allValues.forEach(v=>map[v]=[]);
   const unassigned = [];
   baseTasks.forEach(t=>{
-    if(keyField==='responsavel'){
-      const resps = Array.isArray(t.responsaveis) ? t.responsaveis : [];
-      if(!resps.length){ unassigned.push(t); return; }
-      resps.forEach(v=>{
+    if(keyField==='responsavel' || keyField==='time'){
+      const arr = keyField==='responsavel'
+        ? (Array.isArray(t.responsaveis) ? t.responsaveis : [])
+        : (Array.isArray(t.times) ? t.times : []);
+      if(!arr.length){ unassigned.push(t); return; }
+      arr.forEach(v=>{
         if(map.hasOwnProperty(v)) map[v].push(t);
         else { map[v]=map[v]||[]; map[v].push(t); }
       });
@@ -1570,7 +1919,7 @@ function renderGroupedCards(gridId, keyField, allValues, unassignedLabel, filter
     const doneCount = tasks.filter(t=>t.status==='Concluído').length;
     html += cardHtml(name, tasks, doneCount);
   });
-  if(keyField==='responsavel' && unassigned.length){
+  if((keyField==='responsavel' || keyField==='time') && unassigned.length){
     html += cardHtml(unassignedLabel, unassigned, unassigned.filter(t=>t.status==='Concluído').length, true);
   }
   grid.innerHTML = html || `<div class="empty-state"><div class="big">👥</div>Nada por aqui ainda.</div>`;
@@ -1586,7 +1935,7 @@ function cardHtml(name, tasks, doneCount, muted){
       </div>
       <div class="t-meta">
         <span>${escapeHtml(t.grupo)}</span>
-        <span>${escapeHtml(t.time)}</span>
+        ${(t.times && t.times.length) ? `<span>${escapeHtml(t.times.join(', '))}</span>` : ''}
         <span class="deadline clickable ${late?'late':''}" onclick="openDatePopover(event, ${t.id})">📅 ${fmtDate(t.prazo)}</span>
         <span class="pr-${slug(t.prioridade)}">${t.prioridade}</span>
         <span>${t.pct}%</span>
@@ -1659,7 +2008,7 @@ document.querySelectorAll('.side-link').forEach(btn=>{
     currentTab = btn.dataset.tab;
     currentEventoTab = null;
     if(currentTab==='geral') document.getElementById('fEvento').value = '';
-    ['dashboard','geral','responsavel','time','config'].forEach(t=>{
+    ['dashboard','geral','responsavel','time','calendario','config'].forEach(t=>{
       document.getElementById('tab-'+t).style.display = (t===currentTab)?'':'none';
     });
     renderAll();
@@ -1674,7 +2023,7 @@ window.openEventTab = function(btn){
   btn.classList.add('active');
   currentTab = 'geral';
   currentEventoTab = ev;
-  ['dashboard','geral','responsavel','time','config'].forEach(t=>{
+  ['dashboard','geral','responsavel','time','calendario','config'].forEach(t=>{
     document.getElementById('tab-'+t).style.display = (t===currentTab)?'':'none';
   });
   renderAll();
@@ -1712,12 +2061,12 @@ document.getElementById('btnClearFiltersResp').onclick = ()=>{
   renderGroupedCards('gridResp','responsavel', MEMBROS, 'Sem responsável definido', 'Resp');
 };
 ['fSearchTime','fEventoTime','fGrupoTime','fStatusTime','fPrioTime'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', ()=> renderGroupedCards('gridTime','time', TIMES, '', 'Time'));
+  document.getElementById(id).addEventListener('input', ()=> renderGroupedCards('gridTime','time', TIMES, 'Sem time definido', 'Time'));
 });
 document.getElementById('btnClearFiltersTime').onclick = ()=>{
   document.getElementById('fSearchTime').value='';
   ['fEventoTime','fGrupoTime','fStatusTime','fPrioTime'].forEach(id=>document.getElementById(id).value='');
-  renderGroupedCards('gridTime','time', TIMES, '', 'Time');
+  renderGroupedCards('gridTime','time', TIMES, 'Sem time definido', 'Time');
 };
 
 /* ================= MODAL: NOVA / EDITAR TAREFA ================= */
@@ -1788,7 +2137,7 @@ function toCSVValue(v){
 function exportReportCSV(){
   const headers = ['Evento','Grupo','Tarefa','Time','Responsável','Prazo','Status','Prioridade','Progresso (%)','Observações'];
   const rows = TASKS.map(t=>[
-    t.evento||'', t.grupo||'', t.tarefa||'', t.time||'', (Array.isArray(t.responsaveis)?t.responsaveis.join(', '):''),
+    t.evento||'', t.grupo||'', t.tarefa||'', (Array.isArray(t.times)?t.times.join(', '):''), (Array.isArray(t.responsaveis)?t.responsaveis.join(', '):''),
     fmtDate(t.prazo), effectiveStatus(t), t.prioridade||'', t.pct, t.obs||''
   ]);
   // usa ; como separador (padrão do Excel em português) e BOM para acentos abrirem certo
@@ -1841,7 +2190,9 @@ document.getElementById('fileImportCSV').onchange = (e)=>{
         const tarefa = iTarefa>=0 ? (row[iTarefa]||'').trim() : '';
         if(!tarefa) continue;
         const time = iTime>=0 ? (row[iTime]||'').trim() : '';
+        const times = time ? time.split(',').map(s=>s.trim()).filter(Boolean) : [];
         const resp = iResp>=0 ? (row[iResp]||'').trim() : '';
+        const responsaveis = resp ? resp.split(',').map(s=>s.trim()).filter(Boolean) : [];
         const prazoRaw = iPrazo>=0 ? (row[iPrazo]||'').trim() : '';
         const status = iStatus>=0 ? normStatus(row[iStatus]) : 'Não iniciado';
         const prio = iPrio>=0 ? normPrio(row[iPrio]) : 'Média';
@@ -1852,14 +2203,14 @@ document.getElementById('fileImportCSV').onchange = (e)=>{
         const prazoISO = prazoRaw ? toISODate(prazoRaw) : new Date().toISOString().slice(0,10);
 
         TASKS.push({
-          id: uid++, evento: evento || EVENTOS[0] || '', grupo, tarefa, time, responsavel: resp,
+          id: uid++, evento: evento || EVENTOS[0] || '', grupo, tarefa, times, responsaveis,
           prazo: prazoISO, status, prioridade: prio, pct, obs
         });
 
         if(evento && !EVENTOS.includes(evento)) EVENTOS.push(evento);
         if(grupo && !GRUPOS.includes(grupo)) GRUPOS.push(grupo);
-        if(time && !TIMES.includes(time)) TIMES.push(time);
-        if(resp && !MEMBROS.includes(resp)) MEMBROS.push(resp);
+        times.forEach(tm=>{ if(!TIMES.includes(tm)) TIMES.push(tm); });
+        responsaveis.forEach(rp=>{ if(!MEMBROS.includes(rp)) MEMBROS.push(rp); });
         count++;
       }
       renderAll();
@@ -1954,6 +2305,14 @@ function renderFldRespList(selecionados){
 function getSelectedResp(){
   return Array.from(document.querySelectorAll('#fldRespList input[type=checkbox]:checked')).map(c=>c.value);
 }
+function renderFldTimesList(selecionados){
+  const cont = document.getElementById('fldTimesList');
+  if(!TIMES.length){ cont.innerHTML = '<span class="resp-empty">Nenhum time cadastrado.</span>'; return; }
+  cont.innerHTML = TIMES.map(m=>`<label><input type="checkbox" value="${escapeHtml(m)}" ${selecionados.includes(m)?'checked':''}> ${escapeHtml(m)}</label>`).join('');
+}
+function getSelectedTimes(){
+  return Array.from(document.querySelectorAll('#fldTimesList input[type=checkbox]:checked')).map(c=>c.value);
+}
 
 function openNew(grupoPreset){
   editingId = null;
@@ -1962,7 +2321,7 @@ function openNew(grupoPreset){
   document.getElementById('fldTarefa').value='';
   document.getElementById('fldEvento').value = currentEventoTab || EVENTOS[0]||'';
   document.getElementById('fldGrupo').value = grupoPreset || GRUPOS[0]||'';
-  document.getElementById('fldTime').value = TIMES[0]||'';
+  renderFldTimesList([]);
   renderFldRespList([]);
   document.getElementById('fldPrazo').value = new Date().toISOString().slice(0,10);
   document.getElementById('fldStatus').value = 'Não iniciado';
@@ -1981,7 +2340,7 @@ window.openEdit = (id)=>{
   document.getElementById('fldTarefa').value = t.tarefa;
   document.getElementById('fldEvento').value = t.evento || EVENTOS[0] || '';
   document.getElementById('fldGrupo').value = t.grupo;
-  document.getElementById('fldTime').value = t.time;
+  renderFldTimesList(Array.isArray(t.times) ? t.times : []);
   renderFldRespList(Array.isArray(t.responsaveis) ? t.responsaveis : []);
   document.getElementById('fldPrazo').value = t.prazo;
   document.getElementById('fldStatus').value = t.status;
@@ -2001,7 +2360,7 @@ document.getElementById('btnSaveTask').onclick = ()=>{
     tarefa,
     evento: document.getElementById('fldEvento').value,
     grupo: document.getElementById('fldGrupo').value,
-    time: document.getElementById('fldTime').value,
+    times: getSelectedTimes(),
     responsaveis: getSelectedResp(),
     prazo: document.getElementById('fldPrazo').value,
     status: document.getElementById('fldStatus').value,
@@ -2241,7 +2600,7 @@ function renderDashboard(){
 
   // --- Por time
   const teamItems = TIMES.map(tm=>{
-    const tt = TASKS.filter(t=>t.time===tm);
+    const tt = TASKS.filter(t=>Array.isArray(t.times) && t.times.includes(tm));
     return {label:tm, done: tt.filter(t=>effectiveStatus(t)==='Concluído').length, total: tt.length, color:'var(--blue)'};
   });
   const teamHtml = `
@@ -2282,7 +2641,7 @@ function renderDashboard(){
           const cls = d<=1 ? 'soon' : 'ok';
           const label = d===0 ? 'hoje' : d===1 ? '1 dia' : d+' dias';
           return `<div class="dl-item">
-            <div><div class="dl-name">${escapeHtml(t.tarefa)}</div><div class="dl-meta">${escapeHtml(t.grupo)} · ${escapeHtml(t.responsavel||'sem responsável')}</div></div>
+            <div><div class="dl-name">${escapeHtml(t.tarefa)}</div><div class="dl-meta">${escapeHtml(t.grupo)} · ${escapeHtml((t.responsaveis&&t.responsaveis.length)?t.responsaveis.join(', '):'sem responsável')}</div></div>
             <span class="dl-days ${cls}">${label}</span>
           </div>`;
         }).join('') : '<div class="empty-note">Nada previsto por enquanto.</div>'}
@@ -2299,7 +2658,7 @@ function renderDashboard(){
         ${lateTasks.length ? lateTasks.map(t=>{
           const d = Math.abs(daysBetween(t.prazo));
           return `<div class="dl-item">
-            <div><div class="dl-name">${escapeHtml(t.tarefa)}</div><div class="dl-meta">${escapeHtml(t.grupo)} · ${escapeHtml(t.responsavel||'sem responsável')}</div></div>
+            <div><div class="dl-name">${escapeHtml(t.tarefa)}</div><div class="dl-meta">${escapeHtml(t.grupo)} · ${escapeHtml((t.responsaveis&&t.responsaveis.length)?t.responsaveis.join(', '):'sem responsável')}</div></div>
             <span class="dl-days late">${d}d atraso</span>
           </div>`;
         }).join('') : '<div class="empty-note">Nenhuma tarefa atrasada. 🎉</div>'}
@@ -2318,7 +2677,8 @@ function renderAll(){
   if(currentTab==='dashboard') renderDashboard();
   if(currentTab==='geral'){ if(currentView==='kanban') renderKanban(); else if(currentView==='notas') renderNotas(); else renderGeral(); }
   if(currentTab==='responsavel') renderGroupedCards('gridResp','responsavel', MEMBROS, 'Sem responsável definido', 'Resp');
-  if(currentTab==='time') renderGroupedCards('gridTime','time', TIMES, '', 'Time');
+  if(currentTab==='time') renderGroupedCards('gridTime','time', TIMES, 'Sem time definido', 'Time');
+  if(currentTab==='calendario') renderCalendario();
   if(currentTab==='config') renderConfigLists();
 }
 renderAll();
